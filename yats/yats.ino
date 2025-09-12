@@ -2,15 +2,19 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 #include <DHT.h>
 #include <WiFi.h>
 #include "time.h"
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET    -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define SCREEN_WIDTH   64
+#define SCREEN_HEIGHT 128
+#define OLED_MOSI     11
+#define OLED_CLK      10
+#define OLED_DC       8
+#define OLED_CS       9
+#define OLED_RST      12
+Adafruit_SH1107 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
 #define DHTPIN 16
 #define DHTTYPE DHT22
@@ -90,10 +94,11 @@ void setup() {
 
   dht.begin();
 
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.begin(0, true);
+  display.setRotation(1);
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 27);
   display.print("yats");
   display.display();
@@ -129,8 +134,15 @@ void loop() {
       } else {
         display.setCursor(0, 27);
         display.clearDisplay();
-        display.printf("%.1f°C %.1f%%", temp, humi);
+        //display.printf("%.1f°C %.1f%%", temp, humi);
+        display.printf("%.1f", temp);
+        display.print((char)247);
+        display.printf("C %.1f%%", humi);
         display.display();
+        struct tm timeinfo;
+        gmtime_r(&now, &timeinfo);
+        Serial.print("Current time: ");
+        Serial.println(asctime(&timeinfo));
         Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", temp, humi);
       }
     }
