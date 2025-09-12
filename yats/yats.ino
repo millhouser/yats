@@ -5,7 +5,7 @@
 #include <Adafruit_SSD1306.h>
 #include <DHT.h>
 #include <WiFi.h>
-#include <time.h>
+#include "time.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -21,7 +21,8 @@ DHT dht(DHTPIN, DHTTYPE);
 
 const char* ssid = "home";
 const char* password = "HilpeTritsche";
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer1 = "pool.ntp.org";
+const char* ntpServer2 = "ptbtime1.ptb.de";
 const long gmtOffset_sec = 2 * 3600;
 const int daylightOffset_sec = 0;
 
@@ -47,15 +48,40 @@ void connectToWiFi() {
   }
 }
 
-void printLocalTime() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
-    return;
+// void printLocalTime() {
+// /*
+//   struct tm timeinfo;
+//   if (!getLocalTime(&timeinfo)) {
+//     Serial.println("Failed to obtain time");
+//     return;
+//   }
+//   Serial.printf("Zeit gesetzt: %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+// */
+//   Serial.println("");
+//   struct tm timeinfo;
+//   gmtime_r(&now, &timeinfo);
+//   Serial.print("Current time: ");
+//   Serial.print(asctime(&timeinfo));
+
+// }
+
+void setClock() {
+  NTP.begin("pool.ntp.org", "time.nist.gov");
+
+  Serial.print("Waiting for NTP time sync: ");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
   }
-  Serial.printf("Zeit gesetzt: %02d:%02d:%02d
-", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Current time: ");
+  Serial.print(asctime(&timeinfo));
 }
+
 
 void setup() {
   Serial.begin(115200);
@@ -74,7 +100,8 @@ void setup() {
   delay(1000);
 
   connectToWiFi();
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+  setClock();
 }
 
 void loop() {
@@ -89,7 +116,8 @@ void loop() {
     if (currenttime - lasttime10min >= 600000) {
       lasttime10min = currenttime;
       connectToWiFi();
-      printLocalTime();
+      //printLocalTime();
+      setClock();
     }
 
     if (currenttime - lasttime5s >= 5000) {
@@ -103,8 +131,7 @@ void loop() {
         display.clearDisplay();
         display.printf("%.1f°C %.1f%%", temp, humi);
         display.display();
-        Serial.printf("Temp: %.1f°C, Humi: %.1f%%
-", temp, humi);
+        Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", temp, humi);
       }
     }
   } else {
