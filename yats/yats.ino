@@ -24,7 +24,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #define KEY_B 17
 
 const char* ssid = "home";
-const char* password = "secretpassword";
+const char* password = "secretpw";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "ptbtime1.ptb.de";
 const long gmtOffset_sec = 2 * 3600;
@@ -51,23 +51,6 @@ void connectToWiFi() {
     Serial.println("WiFi connection failed");
   }
 }
-
-// void printLocalTime() {
-// /*
-//   struct tm timeinfo;
-//   if (!getLocalTime(&timeinfo)) {
-//     Serial.println("Failed to obtain time");
-//     return;
-//   }
-//   Serial.printf("Zeit gesetzt: %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-// */
-//   Serial.println("");
-//   struct tm timeinfo;
-//   gmtime_r(&now, &timeinfo);
-//   Serial.print("Current time: ");
-//   Serial.print(asctime(&timeinfo));
-
-// }
 
 void setClock() {
   NTP.begin("pool.ntp.org", "time.nist.gov");
@@ -97,12 +80,13 @@ void setup() {
   display.begin(0, true);
   display.setRotation(1);
   display.clearDisplay();
-  display.setTextSize(1);
+  display.setTextSize(5);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(0, 27);
+  display.setCursor(3, 6);
   display.print("yats");
   display.display();
   delay(1000);
+  display.setTextSize(4);
 
   connectToWiFi();
   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
@@ -116,41 +100,62 @@ void loop() {
     state = newstate;
   }
 
-  if (state == 0) {
-    display.clearDisplay();
-    if (currenttime - lasttime10min >= 600000) {
-      lasttime10min = currenttime;
-      connectToWiFi();
-      //printLocalTime();
-      setClock();
-    }
-
-    if (currenttime - lasttime5s >= 5000) {
-      lasttime5s = currenttime;
-      float temp = dht.readTemperature();
-      float humi = dht.readHumidity();
-      if (isnan(temp) || isnan(humi)) {
-        Serial.println("Lesefehler DHT22!");
-      } else {
-        display.setCursor(0, 27);
-        display.clearDisplay();
-        //display.printf("%.1f°C %.1f%%", temp, humi);
-        display.printf("%.1f", temp);
-        display.print((char)247);
-        display.printf("C %.1f%%", humi);
-        display.display();
-        struct tm timeinfo;
-        gmtime_r(&now, &timeinfo);
-        Serial.print("Current time: ");
-        Serial.println(asctime(&timeinfo));
-        Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", temp, humi);
+  switch (state) {
+    case 0:
+      display.clearDisplay();
+      if (currenttime - lasttime10min >= 600000) {
+        lasttime10min = currenttime;
+        connectToWiFi();
+        //printLocalTime();
+        setClock();
       }
-    }
-  } else {
-    display.clearDisplay();
-    display.setCursor(0, 27);
-    display.print(state);
-    display.display();
+
+      if (currenttime - lasttime5s >= 5000) {
+        lasttime5s = currenttime;
+        float temp = dht.readTemperature();
+        float humi = dht.readHumidity();
+        if (isnan(temp) || isnan(humi)) {
+          Serial.println("Lesefehler DHT22!");
+        } else {
+          display.setCursor(9, 0);
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.printf("%.1f", temp);
+          display.print((char)247);
+          display.printf("C");
+
+          display.setCursor(87, 9);
+          display.setTextSize(1);
+          display.printf("%.1f%%", humi);
+
+          display.setTextSize(1);
+          display.setCursor(15, 57);
+
+          time_t now = time(nullptr);
+          struct tm timeinfo;
+          gmtime_r(&now, &timeinfo);
+          display.printf("%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
+          display.display();
+
+          Serial.print("Current time: ");
+          Serial.println(asctime(&timeinfo));
+          Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", temp, humi);
+        }
+      }
+      break;
+    case 1:
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.print("IP-Adresse:");
+      display.setCursor(0, 9);
+      display.print(WiFi.localIP());
+      display.display();
+      break;
+    default:
+      display.clearDisplay();
+      display.setCursor(0, 27);
+      display.print(state);
+      display.display();
   }
 
   if (digitalRead(KEY_B) == LOW) {
