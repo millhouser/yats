@@ -24,7 +24,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #define KEY_B 17
 
 const char* ssid = "home";
-const char* password = "HilpeTritsche";
+const char* password = "secretpassword";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "ptbtime1.ptb.de";
 const long gmtOffset_sec = 2 * 3600;
