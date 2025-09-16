@@ -1,4 +1,3 @@
-
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -6,6 +5,7 @@
 #include <DHT.h>
 #include <WiFi.h>
 #include "time.h"
+#include <limits.h>
 
 #define SCREEN_WIDTH   64
 #define SCREEN_HEIGHT 128
@@ -23,18 +23,34 @@ DHT dht(DHTPIN, DHTTYPE);
 #define KEY_A 15
 #define KEY_B 17
 
+#define MEASUREMENT_INTERVALL   5000
+#define RECONNECT_INTERVALL   600000
+
+enum states { NORMAL, MINMAX_TEMP, MINMAX_HUMI, IP_ADDRESS};
+
+struct measurement {
+  time_t time = 0;
+  float temp = 0.0;
+  float humi = 0.0;
+};
+struct measurement current_measurement;
+struct measurement max_temp;
+struct measurement min_temp;
+struct measurement max_humi;
+struct measurement min_humi;
+
 const char* ssid = "home";
-const char* password = "secretpw";
+const char* password = "secretPassword";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "ptbtime1.ptb.de";
-const long gmtOffset_sec = 2 * 3600;
-const int daylightOffset_sec = 0;
+//const long gmtOffset_sec = 2 * 3600;
+//const int daylightOffset_sec = 0;
 
-int state = 1;
-int newstate = 0;
+int state = 0;
+//int newstate = 0;
 bool keys_locked = false;
-unsigned long lasttime5s = 0;
-unsigned long lasttime10min = 0;
+unsigned long lastMeasurementMillis = 0;
+unsigned long lastReconnectMillis = 0;
 
 void connectToWiFi() {
   Serial.println("Connecting to WiFi...");
@@ -69,6 +85,88 @@ void setClock() {
   Serial.print(asctime(&timeinfo));
 }
 
+int measure() {
+  int ret = 0;
+
+  time_t now = time(nullptr);
+  // struct tm timeinfo;
+  // gmtime_r(&now, &timeinfo);
+
+  float temp = dht.readTemperature();
+  float humi = dht.readHumidity();
+
+  if (isnan(temp) || isnan(humi)) {
+    Serial.println("Lesefehler DHT22!");
+    return -1;
+  } else {
+    current_measurement.time = now;
+    current_measurement.temp = temp;
+    current_measurement.humi = humi;
+  }
+
+  return 0;
+}
+
+char * dateTimeStr(time_t t) {
+  struct tm timeinfo;
+  char dts[15];
+
+  gmtime_r(&t, &timeinfo);
+
+  sprintf(dts, "%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
+
+  return dts;
+
+}
+
+void displayMeasurement() {
+  display.setCursor(9, 0);
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.printf("%.1f", current_measurement.temp);
+  display.print((char)247);
+  display.printf("C");
+
+  display.setCursor(87, 9);
+  display.setTextSize(1);
+  display.printf("%.1f%%", current_measurement.humi);
+
+  display.setTextSize(1);
+  display.setCursor(15, 57);
+
+  // struct tm timeinfo;
+  // gmtime_r(&current_measurement.time, &timeinfo);
+
+  // display.printf("%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
+  display.printf(dateTimeStr(current_measurement.time));
+  display.display();
+
+  // Serial.print("Current time: ");
+  // Serial.println(asctime(&timeinfo));
+  // Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", current_measurement.temp, current_measurement.humi);
+}
+
+void setMinMax() {
+  // set max_temp
+  if ((max_temp.time == 0) || (current_measurement.temp > max_temp.temp)) {
+    max_temp = current_measurement;
+  }
+
+  // set min_temp
+  if ((min_temp.time == 0) || (current_measurement.temp < min_temp.temp)) {
+    min_temp = current_measurement;
+  }
+
+  // set max_humi
+  if ((max_humi.time == 0) || (current_measurement.humi > max_humi.humi)) {
+    max_humi = current_measurement;
+  }
+
+  // set min_humi
+  if ((min_humi.time == 0) || (current_measurement.humi < min_humi.humi)) {
+    min_humi = current_measurement;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -96,54 +194,61 @@ void setup() {
 void loop() {
   unsigned long currenttime = millis();
 
-  if (state != newstate) {
-    state = newstate;
-  }
+  // if (state != newstate) {
+  //   state = newstate;
+  // }
 
   switch (state) {
-    case 0:
+    case 0: //NORMAL:
       display.clearDisplay();
-      if (currenttime - lasttime10min >= 600000) {
-        lasttime10min = currenttime;
+
+      if (currenttime < lastMeasurementMillis) {
+        lastMeasurementMillis = MEASUREMENT_INTERVALL -( ULONG_MAX - lastMeasurementMillis);
+      }
+      if (currenttime < lastReconnectMillis) {
+        lastMeasurementMillis = RECONNECT_INTERVALL - (ULONG_MAX - lastMeasurementMillis);
+      }
+
+      if (currenttime - lastReconnectMillis >= RECONNECT_INTERVALL) {
+        lastReconnectMillis = currenttime;
         connectToWiFi();
-        //printLocalTime();
         setClock();
       }
 
-      if (currenttime - lasttime5s >= 5000) {
-        lasttime5s = currenttime;
-        float temp = dht.readTemperature();
-        float humi = dht.readHumidity();
-        if (isnan(temp) || isnan(humi)) {
-          Serial.println("Lesefehler DHT22!");
-        } else {
-          display.setCursor(9, 0);
-          display.clearDisplay();
-          display.setTextSize(2);
-          display.printf("%.1f", temp);
-          display.print((char)247);
-          display.printf("C");
+      if (currenttime - lastMeasurementMillis >= MEASUREMENT_INTERVALL) {
+        lastMeasurementMillis = currenttime;
 
-          display.setCursor(87, 9);
-          display.setTextSize(1);
-          display.printf("%.1f%%", humi);
-
-          display.setTextSize(1);
-          display.setCursor(15, 57);
-
-          time_t now = time(nullptr);
-          struct tm timeinfo;
-          gmtime_r(&now, &timeinfo);
-          display.printf("%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
-          display.display();
-
-          Serial.print("Current time: ");
-          Serial.println(asctime(&timeinfo));
-          Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", temp, humi);
+        if (measure() == 0) {
+          displayMeasurement();
+          setMinMax();
         }
       }
       break;
-    case 1:
+    case 1: //MAX_TEMP + MAX_HUMI
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.printf("maximale Temperatur: %.1f", max_temp.temp);
+      display.setCursor(0, 9);
+      display.printf(" %s", dateTimeStr(max_temp.time));
+      display.setCursor(0, 18);
+      display.printf("maximale Feuchte:    %.1f", max_humi.humi);
+      display.setCursor(0, 27);
+      display.printf(" %s", dateTimeStr(max_humi.time));
+      display.display();
+      break;
+    case 2: //MIN_TEMP + MIN_HUMI
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.printf("minimale Temperatur: %.1f", min_temp.temp);
+      display.setCursor(0, 9);
+      display.printf(" %s", dateTimeStr(min_temp.time));
+      display.setCursor(0, 18);
+      display.printf("minimale Feuchte:    %.1f", min_humi.humi);
+      display.setCursor(0, 27);
+      display.printf(" %s", dateTimeStr(min_humi.time));
+      display.display();
+      break;
+    case 3: //IP_ADDRESS:
       display.clearDisplay();
       display.setCursor(0, 0);
       display.print("IP-Adresse:");
@@ -160,8 +265,8 @@ void loop() {
 
   if (digitalRead(KEY_B) == LOW) {
     keys_locked = true;
-    newstate = state - 1;
-    if (newstate < 0) newstate = 4;
+    state = state - 1;
+    if (state < 0) state = 4;
     delay(200);
   } else {
     keys_locked = false;
@@ -169,8 +274,8 @@ void loop() {
 
   if (digitalRead(KEY_A) == LOW) {
     keys_locked = true;
-    newstate = state + 1;
-    if (newstate > 4) newstate = 0;
+    state = state + 1;
+    if (state > 4) state = 0;
     delay(200);
   } else {
     keys_locked = false;
