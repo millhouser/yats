@@ -214,11 +214,11 @@ void loop() {
     case 1: //MAX_TEMP + MAX_HUMI
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.printf("maximale Temperatur: %.1f", max_temp.temp);
+      display.printf("max. Temp.:   %.1f", max_temp.temp);
       display.setCursor(0, 9);
       display.printf(" %s", dateTimeStr(max_temp.time));
       display.setCursor(0, 18);
-      display.printf("maximale Feuchte:    %.1f", max_humi.humi);
+      display.printf("max. Feuchte: %.1f", max_humi.humi);
       display.setCursor(0, 27);
       display.printf(" %s", dateTimeStr(max_humi.time));
       display.display();
@@ -226,11 +226,11 @@ void loop() {
     case 2: //MIN_TEMP + MIN_HUMI
       display.clearDisplay();
       display.setCursor(0, 0);
-      display.printf("minimale Temperatur: %.1f", min_temp.temp);
+      display.printf("min. Temp.:   %.1f", min_temp.temp);
       display.setCursor(0, 9);
       display.printf(" %s", dateTimeStr(min_temp.time));
       display.setCursor(0, 18);
-      display.printf("minimale Feuchte:    %.1f", min_humi.humi);
+      display.printf("min. Feuchte: %.1f", min_humi.humi);
       display.setCursor(0, 27);
       display.printf(" %s", dateTimeStr(min_humi.time));
       display.display();
