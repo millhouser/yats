@@ -47,7 +47,6 @@ const char* ntpServer2 = "ptbtime1.ptb.de";
 //const int daylightOffset_sec = 0;
 
 int state = 0;
-//int newstate = 0;
 bool keys_locked = false;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
@@ -89,8 +88,6 @@ int measure() {
   int ret = 0;
 
   time_t now = time(nullptr);
-  // struct tm timeinfo;
-  // gmtime_r(&now, &timeinfo);
 
   float temp = dht.readTemperature();
   float humi = dht.readHumidity();
@@ -109,7 +106,7 @@ int measure() {
 
 char * dateTimeStr(time_t t) {
   struct tm timeinfo;
-  char dts[15];
+  static char dts[15];
 
   gmtime_r(&t, &timeinfo);
 
@@ -134,16 +131,8 @@ void displayMeasurement() {
   display.setTextSize(1);
   display.setCursor(15, 57);
 
-  // struct tm timeinfo;
-  // gmtime_r(&current_measurement.time, &timeinfo);
-
-  // display.printf("%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
   display.printf(dateTimeStr(current_measurement.time));
   display.display();
-
-  // Serial.print("Current time: ");
-  // Serial.println(asctime(&timeinfo));
-  // Serial.printf("Temp: %.1f°C, Humi: %.1f%%\n", current_measurement.temp, current_measurement.humi);
 }
 
 void setMinMax() {
@@ -192,37 +181,35 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currenttime = millis();
+  unsigned long currentMillis = millis();
 
-  // if (state != newstate) {
-  //   state = newstate;
-  // }
+  // always measure
+  if (currentMillis < lastMeasurementMillis) {
+    lastMeasurementMillis = MEASUREMENT_INTERVALL -( ULONG_MAX - lastMeasurementMillis);
+  }
+  if (currentMillis < lastReconnectMillis) {
+    lastMeasurementMillis = RECONNECT_INTERVALL - (ULONG_MAX - lastReconnectMillis);
+  }
+
+  if (currentMillis - lastReconnectMillis >= RECONNECT_INTERVALL) {
+    lastReconnectMillis = currentMillis;
+    connectToWiFi();
+    setClock();
+  }
+
+  if (currentMillis - lastMeasurementMillis >= MEASUREMENT_INTERVALL) {
+    lastMeasurementMillis = currentMillis;
+
+    if (measure() == 0) {
+      setMinMax();
+    }
+  }
 
   switch (state) {
     case 0: //NORMAL:
       display.clearDisplay();
+      displayMeasurement();
 
-      if (currenttime < lastMeasurementMillis) {
-        lastMeasurementMillis = MEASUREMENT_INTERVALL -( ULONG_MAX - lastMeasurementMillis);
-      }
-      if (currenttime < lastReconnectMillis) {
-        lastMeasurementMillis = RECONNECT_INTERVALL - (ULONG_MAX - lastMeasurementMillis);
-      }
-
-      if (currenttime - lastReconnectMillis >= RECONNECT_INTERVALL) {
-        lastReconnectMillis = currenttime;
-        connectToWiFi();
-        setClock();
-      }
-
-      if (currenttime - lastMeasurementMillis >= MEASUREMENT_INTERVALL) {
-        lastMeasurementMillis = currenttime;
-
-        if (measure() == 0) {
-          displayMeasurement();
-          setMinMax();
-        }
-      }
       break;
     case 1: //MAX_TEMP + MAX_HUMI
       display.clearDisplay();
