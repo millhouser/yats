@@ -7,7 +7,8 @@
 #include "time.h"
 #include <limits.h>
 
-#define SCREEN_WIDTH   64
+#define DEG (char)247 // '°' on the display
+#define SCREEN_WIDTH   64 // 21 characters per line
 #define SCREEN_HEIGHT 128
 #define OLED_MOSI     11
 #define OLED_CLK      10
@@ -22,17 +23,20 @@ DHT dht(DHTPIN, DHTTYPE);
 
 #define KEY_A 15
 #define KEY_B 17
+bool keyBpressed = false;
 
 #define MEASUREMENT_INTERVALL   5000
 #define RECONNECT_INTERVALL   600000
 
 enum states { NORMAL, MINMAX_TEMP, MINMAX_HUMI, IP_ADDRESS};
+enum minmax { MINMAX_MIN, MINMAX_MAX};
 
 struct measurement {
   time_t time = 0;
   float temp = 0.0;
   float humi = 0.0;
 };
+
 struct measurement current_measurement;
 struct measurement max_temp;
 struct measurement min_temp;
@@ -117,13 +121,12 @@ char * dateTimeStr(time_t t) {
 }
 
 void displayMeasurement() {
+  display.clearDisplay();
   display.setCursor(9, 0);
   display.clearDisplay();
   display.setTextSize(2);
-  display.printf("%.1f", current_measurement.temp);
-  display.print((char)247);
-  display.printf("C");
-
+  display.printf("%.1f%cC", current_measurement.temp, DEG);
+  
   display.setCursor(87, 9);
   display.setTextSize(1);
   display.printf("%.1f%%", current_measurement.humi);
@@ -135,25 +138,61 @@ void displayMeasurement() {
   display.display();
 }
 
-void setMinMax() {
-  // set max_temp
-  if ((max_temp.time == 0) || (current_measurement.temp > max_temp.temp)) {
-    max_temp = current_measurement;
+void displayMinMax(enum minmax mm) {
+  display.clearDisplay();
+  display.setCursor(0, 9);
+  
+  if (mm == MINMAX_MIN) {
+    display.printf("min. Temp.:   %.1f%cC", min_temp.temp, DEG);
+    display.setCursor(0, 18);
+    display.printf(" %s", dateTimeStr(min_temp.time));
+
+    display.setCursor(0, 36);
+    display.printf("min. Feuchte: %.1f%%", min_humi.humi);
+    display.setCursor(0, 45);
+    display.printf(" %s", dateTimeStr(min_humi.time));
   }
 
+  if (mm == MINMAX_MAX) {
+    display.printf("max. Temp.:   %.1f%cC", max_temp.temp, DEG);
+    display.setCursor(0, 18);
+    display.printf(" %s", dateTimeStr(max_temp.time));
+
+    display.setCursor(0, 36);
+    display.printf("max. Feuchte: %.1f%%", max_humi.humi);
+    display.setCursor(0, 45);
+    display.printf(" %s", dateTimeStr(max_humi.time));
+  }
+
+  display.display();
+}
+
+void resetMinMax() {
+    min_temp = current_measurement;
+    min_humi = current_measurement;
+    max_temp = current_measurement;
+    max_humi = current_measurement;
+}
+
+void setMinMax() {
   // set min_temp
   if ((min_temp.time == 0) || (current_measurement.temp < min_temp.temp)) {
     min_temp = current_measurement;
   }
 
-  // set max_humi
-  if ((max_humi.time == 0) || (current_measurement.humi > max_humi.humi)) {
-    max_humi = current_measurement;
-  }
-
   // set min_humi
   if ((min_humi.time == 0) || (current_measurement.humi < min_humi.humi)) {
     min_humi = current_measurement;
+  }
+
+  // set max_temp
+  if ((max_temp.time == 0) || (current_measurement.temp > max_temp.temp)) {
+    max_temp = current_measurement;
+  }
+
+  // set max_humi
+  if ((max_humi.time == 0) || (current_measurement.humi > max_humi.humi)) {
+    max_humi = current_measurement;
   }
 }
 
@@ -178,6 +217,7 @@ void setup() {
   connectToWiFi();
   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
   setClock();
+  resetMinMax();
 }
 
 void loop() {
@@ -207,33 +247,21 @@ void loop() {
 
   switch (state) {
     case 0: //NORMAL:
-      display.clearDisplay();
       displayMeasurement();
-
       break;
     case 1: //MAX_TEMP + MAX_HUMI
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.printf("max. Temp.:   %.1f", max_temp.temp);
-      display.setCursor(0, 9);
-      display.printf(" %s", dateTimeStr(max_temp.time));
-      display.setCursor(0, 18);
-      display.printf("max. Feuchte: %.1f", max_humi.humi);
-      display.setCursor(0, 27);
-      display.printf(" %s", dateTimeStr(max_humi.time));
-      display.display();
+      displayMinMax(MINMAX_MAX);
+      if (keyBpressed) {
+        resetMinMax();
+        keyBpressed = false;
+      }
       break;
     case 2: //MIN_TEMP + MIN_HUMI
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.printf("min. Temp.:   %.1f", min_temp.temp);
-      display.setCursor(0, 9);
-      display.printf(" %s", dateTimeStr(min_temp.time));
-      display.setCursor(0, 18);
-      display.printf("min. Feuchte: %.1f", min_humi.humi);
-      display.setCursor(0, 27);
-      display.printf(" %s", dateTimeStr(min_humi.time));
-      display.display();
+      displayMinMax(MINMAX_MIN);
+      if (keyBpressed) {
+        resetMinMax();
+        keyBpressed = false;
+      }
       break;
     case 3: //IP_ADDRESS:
       display.clearDisplay();
@@ -250,15 +278,6 @@ void loop() {
       display.display();
   }
 
-  if (digitalRead(KEY_B) == LOW) {
-    keys_locked = true;
-    state = state - 1;
-    if (state < 0) state = 4;
-    delay(200);
-  } else {
-    keys_locked = false;
-  }
-
   if (digitalRead(KEY_A) == LOW) {
     keys_locked = true;
     state = state + 1;
@@ -266,5 +285,14 @@ void loop() {
     delay(200);
   } else {
     keys_locked = false;
+  }
+
+  if (digitalRead(KEY_B) == LOW) {
+    keys_locked = true;
+    keyBpressed = true;
+    delay(200);
+  } else {
+    keys_locked = false;
+    keyBpressed = false;
   }
 }
