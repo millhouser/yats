@@ -4,17 +4,17 @@
 #include <Adafruit_SH110X.h>
 #include <DHT.h>
 #include <WiFi.h>
-#include "time.h"
+#include <time.h>
 #include <limits.h>
 
-#define DEG (char)247 // '°' on the display
-#define SCREEN_WIDTH   64 // 21 characters per line
+#define DEG (char)247    // '°' on the display
+#define SCREEN_WIDTH 64  // 21 characters per line
 #define SCREEN_HEIGHT 128
-#define OLED_MOSI     11
-#define OLED_CLK      10
-#define OLED_DC       8
-#define OLED_CS       9
-#define OLED_RST      12
+#define OLED_MOSI 11
+#define OLED_CLK 10
+#define OLED_DC 8
+#define OLED_CS 9
+#define OLED_RST 12
 Adafruit_SH1107 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
 #define DHTPIN 16
@@ -25,11 +25,15 @@ DHT dht(DHTPIN, DHTTYPE);
 #define KEY_B 17
 bool keyBpressed = false;
 
-#define MEASUREMENT_INTERVALL   5000
-#define RECONNECT_INTERVALL   600000
+#define MEASUREMENT_INTERVALL 5000
+#define RECONNECT_INTERVALL 600000
 
-enum states { NORMAL, MINMAX_TEMP, MINMAX_HUMI, IP_ADDRESS};
-enum minmax { MINMAX_MIN, MINMAX_MAX};
+enum states { NORMAL,
+              MINMAX_TEMP,
+              MINMAX_HUMI,
+              IP_ADDRESS };
+enum minmax { MINMAX_MIN,
+              MINMAX_MAX };
 
 struct measurement {
   time_t time = 0;
@@ -47,8 +51,8 @@ const char* ssid = "home";
 const char* password = "secretPassword";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "ptbtime1.ptb.de";
-//const long gmtOffset_sec = 2 * 3600;
-//const int daylightOffset_sec = 0;
+const long gmtOffset_sec = 2 * 3600;
+const int daylightOffset_sec = 0;
 
 int state = 0;
 bool keys_locked = false;
@@ -83,9 +87,11 @@ void setClock() {
   }
   Serial.println("");
   struct tm timeinfo;
-  gmtime_r(&now, &timeinfo);
+  //gmtime_r(&now, &timeinfo);
+  //localtime_r(&now, &timeinfo);
   Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
+//  Serial.print(asctime(&timeinfo));
+  Serial.print(asctime(localtime(&now)));
 }
 
 int measure() {
@@ -108,7 +114,7 @@ int measure() {
   return 0;
 }
 
-char * dateTimeStr(time_t t) {
+char* dateTimeStr(time_t t) {
   struct tm timeinfo;
   static char dts[15];
 
@@ -117,7 +123,6 @@ char * dateTimeStr(time_t t) {
   sprintf(dts, "%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
 
   return dts;
-
 }
 
 void displayMeasurement() {
@@ -126,7 +131,7 @@ void displayMeasurement() {
   display.clearDisplay();
   display.setTextSize(2);
   display.printf("%.1f%cC", current_measurement.temp, DEG);
-  
+
   display.setCursor(87, 9);
   display.setTextSize(1);
   display.printf("%.1f%%", current_measurement.humi);
@@ -141,7 +146,7 @@ void displayMeasurement() {
 void displayMinMax(enum minmax mm) {
   display.clearDisplay();
   display.setCursor(0, 9);
-  
+
   if (mm == MINMAX_MIN) {
     display.printf("min. Temp.:   %.1f%cC", min_temp.temp, DEG);
     display.setCursor(0, 18);
@@ -168,10 +173,10 @@ void displayMinMax(enum minmax mm) {
 }
 
 void resetMinMax() {
-    min_temp = current_measurement;
-    min_humi = current_measurement;
-    max_temp = current_measurement;
-    max_humi = current_measurement;
+  min_temp = current_measurement;
+  min_humi = current_measurement;
+  max_temp = current_measurement;
+  max_humi = current_measurement;
 }
 
 void setMinMax() {
@@ -215,7 +220,7 @@ void setup() {
   display.setTextSize(4);
 
   connectToWiFi();
-  //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
   setClock();
   resetMinMax();
 }
@@ -225,7 +230,7 @@ void loop() {
 
   // always measure
   if (currentMillis < lastMeasurementMillis) {
-    lastMeasurementMillis = MEASUREMENT_INTERVALL -( ULONG_MAX - lastMeasurementMillis);
+    lastMeasurementMillis = MEASUREMENT_INTERVALL - (ULONG_MAX - lastMeasurementMillis);
   }
   if (currentMillis < lastReconnectMillis) {
     lastMeasurementMillis = RECONNECT_INTERVALL - (ULONG_MAX - lastReconnectMillis);
@@ -239,31 +244,30 @@ void loop() {
 
   if (currentMillis - lastMeasurementMillis >= MEASUREMENT_INTERVALL) {
     lastMeasurementMillis = currentMillis;
-
     if (measure() == 0) {
       setMinMax();
     }
   }
 
   switch (state) {
-    case 0: //NORMAL:
+    case 0:  //NORMAL:
       displayMeasurement();
       break;
-    case 1: //MAX_TEMP + MAX_HUMI
+    case 1:  //MAX_TEMP + MAX_HUMI
       displayMinMax(MINMAX_MAX);
       if (keyBpressed) {
         resetMinMax();
         keyBpressed = false;
       }
       break;
-    case 2: //MIN_TEMP + MIN_HUMI
+    case 2:  //MIN_TEMP + MIN_HUMI
       displayMinMax(MINMAX_MIN);
       if (keyBpressed) {
         resetMinMax();
         keyBpressed = false;
       }
       break;
-    case 3: //IP_ADDRESS:
+    case 3:  //IP_ADDRESS:
       display.clearDisplay();
       display.setCursor(0, 0);
       display.print("IP-Adresse:");
