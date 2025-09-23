@@ -4,52 +4,69 @@
 #include <Adafruit_SH110X.h>
 #include <DHT.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <time.h>
 #include <limits.h>
 
+// configure Wifi
+const char* ssid = "home";
+const char* password = "secretPassword";
+
+// define characters for the display
 #define DEG (char)247    // '°' on the display
-#define SCREEN_WIDTH 64  // 21 characters per line
-#define SCREEN_HEIGHT 128
+
+// configure SPI
 #define OLED_MOSI 11
 #define OLED_CLK 10
 #define OLED_DC 8
 #define OLED_CS 9
 #define OLED_RST 12
+
+// configure display
+#define SCREEN_WIDTH 64  // 21 characters per line
+#define SCREEN_HEIGHT 128
 Adafruit_SH1107 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RST, OLED_CS);
 
+// configure DHT22
 #define DHTPIN 16
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
+// configure keys on display
 #define KEY_A 15
 #define KEY_B 17
 bool keyBpressed = false;
 
+// configure web server
+WebServer server(80);
+
+// define intervalls for the state machine
 #define MEASUREMENT_INTERVALL 5000 // seconds
 #define RECONNECT_INTERVALL 600000 // seconds
 
+// state machine states
 enum states { NORMAL,
               MINMAX_TEMP,
               MINMAX_HUMI,
               IP_ADDRESS };
+
+// for the displayMinMax() function
 enum minmax { MINMAX_MIN,
               MINMAX_MAX };
 
+// define struct to store measurement data
 struct measurement {
   time_t time = 0;
   float temp = 0.0;
   float humi = 0.0;
 };
 
+// define measurement variables
 struct measurement current_measurement;
 struct measurement max_temp;
 struct measurement min_temp;
 struct measurement max_humi;
 struct measurement min_humi;
-
-// configure Wifi
-const char* ssid = "home";
-const char* password = "HilpeTritsche";
 
 // configure NTP
 const char* ntpServer1 = "pool.ntp.org";
@@ -57,6 +74,7 @@ const char* ntpServer2 = "ptbtime1.ptb.de";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 
+// setup state machine
 int state = 0;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
@@ -92,6 +110,15 @@ void setClock() {
   localtime_r(&now, &timeinfo);
   Serial.print("Current time: ");
   Serial.print(asctime(&timeinfo));
+}
+
+void handleRoot() {
+  String message = "Aktuell: " + String(current_measurement.temp, 1) + "°C, " + String(current_measurement.humi, 1) + "%, " + String(dateTimeStr(current_measurement.time));
+  message += "\n\nMinimale Temperatur: " + String(min_temp.temp, 1) + "°C, " + String(dateTimeStr(min_temp.time));
+  message += "\nMaximale Temperatur: " + String(max_temp.temp, 1) + "°C, " + String(dateTimeStr(max_temp.time));
+  message += "\n\nMinimale Feuchte: " + String(min_humi.humi, 1) + "%, " + String(dateTimeStr(min_humi.time));
+  message += "\nMaximale Feuchte: " + String(max_humi.humi, 1) + "%, " + String(dateTimeStr(max_humi.time));
+  server.send(200, "text/plain", message);
 }
 
 int measure() {
@@ -229,6 +256,9 @@ void setup() {
   setClock();
   
   resetMinMax();
+
+  server.on("/", handleRoot);
+  server.begin();
 }
 
 void loop() {
@@ -290,7 +320,7 @@ void loop() {
 
   if (digitalRead(KEY_A) == LOW) {
     state = state + 1;
-    if (state > 4) state = 0;
+    if (state > 3) state = 0;
     delay(200);
   } else {
   }
@@ -301,4 +331,6 @@ void loop() {
   } else {
     keyBpressed = false;
   }
+
+  server.handleClient();
 }
