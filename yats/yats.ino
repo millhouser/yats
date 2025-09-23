@@ -25,8 +25,8 @@ DHT dht(DHTPIN, DHTTYPE);
 #define KEY_B 17
 bool keyBpressed = false;
 
-#define MEASUREMENT_INTERVALL 5000
-#define RECONNECT_INTERVALL 600000
+#define MEASUREMENT_INTERVALL 5000 // seconds
+#define RECONNECT_INTERVALL 600000 // seconds
 
 enum states { NORMAL,
               MINMAX_TEMP,
@@ -47,15 +47,17 @@ struct measurement min_temp;
 struct measurement max_humi;
 struct measurement min_humi;
 
+// configure Wifi
 const char* ssid = "home";
-const char* password = "secretPassword";
+const char* password = "HilpeTritsche";
+
+// configure NTP
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "ptbtime1.ptb.de";
-const long gmtOffset_sec = 2 * 3600;
-const int daylightOffset_sec = 0;
+const long gmtOffset_sec = 3600;
+const int daylightOffset_sec = 3600;
 
 int state = 0;
-bool keys_locked = false;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
 
@@ -76,7 +78,7 @@ void connectToWiFi() {
 }
 
 void setClock() {
-  NTP.begin("pool.ntp.org", "time.nist.gov");
+  NTP.begin(ntpServer1, ntpServer2);
 
   Serial.print("Waiting for NTP time sync: ");
   time_t now = time(nullptr);
@@ -87,11 +89,9 @@ void setClock() {
   }
   Serial.println("");
   struct tm timeinfo;
-  //gmtime_r(&now, &timeinfo);
-  //localtime_r(&now, &timeinfo);
+  localtime_r(&now, &timeinfo);
   Serial.print("Current time: ");
-//  Serial.print(asctime(&timeinfo));
-  Serial.print(asctime(localtime(&now)));
+  Serial.print(asctime(&timeinfo));
 }
 
 int measure() {
@@ -118,7 +118,8 @@ char* dateTimeStr(time_t t) {
   struct tm timeinfo;
   static char dts[15];
 
-  gmtime_r(&t, &timeinfo);
+  //gmtime_r(&t, &timeinfo);
+  localtime_r(&t, &timeinfo);
 
   sprintf(dts, "%.2u.%.2u.%.4u %.2u:%.2u", timeinfo.tm_mday, timeinfo.tm_mon, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
 
@@ -137,7 +138,7 @@ void displayMeasurement() {
   display.printf("%.1f%%", current_measurement.humi);
 
   display.setTextSize(1);
-  display.setCursor(15, 57);
+  display.setCursor(15, 18);
 
   display.printf(dateTimeStr(current_measurement.time));
   display.display();
@@ -221,7 +222,12 @@ void setup() {
 
   connectToWiFi();
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+  // set time zone
+  setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);  // Mitteleuropäische Zeit
+  tzset();
+
   setClock();
+  
   resetMinMax();
 }
 
@@ -283,20 +289,16 @@ void loop() {
   }
 
   if (digitalRead(KEY_A) == LOW) {
-    keys_locked = true;
     state = state + 1;
     if (state > 4) state = 0;
     delay(200);
   } else {
-    keys_locked = false;
   }
 
   if (digitalRead(KEY_B) == LOW) {
-    keys_locked = true;
     keyBpressed = true;
     delay(200);
   } else {
-    keys_locked = false;
     keyBpressed = false;
   }
 }
