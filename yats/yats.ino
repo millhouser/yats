@@ -40,6 +40,59 @@ bool keyBpressed = false;
 // configure web server
 WebServer server(80);
 
+// HTML Seite
+const char* htmlPage = u8R"=====(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>yats</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial; margin: 40px; }
+        button { padding: 10px 20px; margin: 5px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>yats Webserver</h1>
+    <p>Temperatur: <span id="current_temp">--.-</span>°C</p>
+    <p>Luftfeuchtigkeit: <span id="current_humi">--.-</span>%</p>
+    <p>Datum/Uhrzeit: <span id="current_datetime">--.--.-- --:--</span></p>
+    <br>
+    <br>
+    <p>Minimale Temperatur: <span id="min_temp">--.-</span>°C, <span id="min_temp_datetime">--.--.-- --:--</span></p>
+    <p>Maximale Temperatur: <span id="max_temp">--.-</span>°C, <span id="max_temp_datetime">--.--.-- --:--</span></p>
+    <br>
+    <br>
+    <p>Minimale Feuchtigkeit: <span id="min_humi">--.-</span>%, <span id="min_humi_datetime">--.--.-- --:--</span></p>
+    <p>Maximale Feuchtigkeit: <span id="max_humi">--.-</span>%, <span id="max_humi_datetime">--.--.-- --:--</span></p>
+    <button onclick="updateSensors()">Aktualisieren</button>
+
+    <script>
+        function updateSensors() {
+            fetch('/sensors')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current_temp').innerText = data.current_temp;
+                    document.getElementById('current_humi').innerText = data.current_humi;
+                    document.getElementById('current_datetime').innerText = data.current_datetime;
+                    document.getElementById('min_temp').innerText = data.min_temp;
+                    document.getElementById('min_temp_datetime').innerText = data.min_temp_datetime;
+                    document.getElementById('max_temp').innerText = data.max_temp;
+                    document.getElementById('max_temp_datetime').innerText = data.max_temp_datetime;
+                    document.getElementById('min_humi').innerText = data.min_humi;
+                    document.getElementById('min_humi_datetime').innerText = data.min_humi_datetime;
+                    document.getElementById('max_humi').innerText = data.max_humi;
+                    document.getElementById('max_humi_datetime').innerText = data.max_humi_datetime;
+                });
+        }
+        
+        // Status beim Laden der Seite aktualisieren
+        updateSensors();
+    </script>
+</body>
+</html>
+)=====";
+
 // define intervalls for the state machine
 #define MEASUREMENT_INTERVALL 5000 // seconds
 #define RECONNECT_INTERVALL 600000 // seconds
@@ -113,12 +166,31 @@ void setClock() {
 }
 
 void handleRoot() {
-  String message = "Aktuell: " + String(current_measurement.temp, 1) + "°C, " + String(current_measurement.humi, 1) + "%, " + String(dateTimeStr(current_measurement.time));
-  message += "\n\nMinimale Temperatur: " + String(min_temp.temp, 1) + "°C, " + String(dateTimeStr(min_temp.time));
-  message += "\nMaximale Temperatur: " + String(max_temp.temp, 1) + "°C, " + String(dateTimeStr(max_temp.time));
-  message += "\n\nMinimale Feuchte: " + String(min_humi.humi, 1) + "%, " + String(dateTimeStr(min_humi.time));
-  message += "\nMaximale Feuchte: " + String(max_humi.humi, 1) + "%, " + String(dateTimeStr(max_humi.time));
-  server.send(200, "text/plain", message);
+  // String message = "Aktuell: " + String(current_measurement.temp, 1) + "°C, " + String(current_measurement.humi, 1) + "%, " + String(dateTimeStr(current_measurement.time));
+  // message += "\n\nMinimale Temperatur: " + String(min_temp.temp, 1) + "°C, " + String(dateTimeStr(min_temp.time));
+  // message += "\nMaximale Temperatur: " + String(max_temp.temp, 1) + "°C, " + String(dateTimeStr(max_temp.time));
+  // message += "\n\nMinimale Feuchte: " + String(min_humi.humi, 1) + "%, " + String(dateTimeStr(min_humi.time));
+  // message += "\nMaximale Feuchte: " + String(max_humi.humi, 1) + "%, " + String(dateTimeStr(max_humi.time));
+  // server.send(200, "text/plain", message);
+  server.send(200, "text/html", htmlPage);
+}
+
+void handleSensors() {
+    String json = "{";
+    json += "\"current_temp\":" + String(current_measurement.temp, 1) + ",\n";
+    json += "\"current_humi\":" + String(current_measurement.humi, 1) + ",\n";
+    json += "\"current_datetime\":\"" + String(dateTimeStr(current_measurement.time)) + "\",\n";
+    json += "\"min_temp\":" + String(min_temp.temp, 1) + ",\n";
+    json += "\"min_temp_datetime\":\"" + String(dateTimeStr(min_temp.time)) + "\",\n";
+    json += "\"max_temp\":" + String(max_temp.temp, 1) + ",\n";
+    json += "\"max_temp_datetime\":\"" + String(dateTimeStr(max_temp.time)) + "\",\n";
+    json += "\"min_humi\":" + String(min_humi.humi, 1) + ",\n";
+    json += "\"min_humi_datetime\":\"" + String(dateTimeStr(min_humi.time)) + "\",\n";
+    json += "\"max_humi\":" + String(max_temp.humi, 1) + ",\n";
+    json += "\"max_humi_datetime\":\"" + String(dateTimeStr(max_humi.time)) + "\"\n";
+    json += "}";
+    
+    server.send(200, "application/json", json);
 }
 
 int measure() {
@@ -171,39 +243,45 @@ void displayMeasurement() {
   display.display();
 }
 
-void displayMinMax(enum minmax mm) {
+void displayMinMaxTemp() {
   display.clearDisplay();
+
   display.setCursor(0, 9);
+  display.printf("min. Temp.:   %.1f%cC", min_temp.temp, DEG);
+  display.setCursor(0, 18);
+  display.printf(" %s", dateTimeStr(min_temp.time));
 
-  if (mm == MINMAX_MIN) {
-    display.printf("min. Temp.:   %.1f%cC", min_temp.temp, DEG);
-    display.setCursor(0, 18);
-    display.printf(" %s", dateTimeStr(min_temp.time));
-
-    display.setCursor(0, 36);
-    display.printf("min. Feuchte: %.1f%%", min_humi.humi);
-    display.setCursor(0, 45);
-    display.printf(" %s", dateTimeStr(min_humi.time));
-  }
-
-  if (mm == MINMAX_MAX) {
-    display.printf("max. Temp.:   %.1f%cC", max_temp.temp, DEG);
-    display.setCursor(0, 18);
-    display.printf(" %s", dateTimeStr(max_temp.time));
-
-    display.setCursor(0, 36);
-    display.printf("max. Feuchte: %.1f%%", max_humi.humi);
-    display.setCursor(0, 45);
-    display.printf(" %s", dateTimeStr(max_humi.time));
-  }
+  display.setCursor(0, 36);
+  display.printf("max. Temp.:   %.1f%cC", max_temp.temp, DEG);
+  display.setCursor(0, 45);
+  display.printf(" %s", dateTimeStr(max_temp.time));
 
   display.display();
 }
 
-void resetMinMax() {
+void displayMinMaxHumi() {
+  display.clearDisplay();
+
+  display.setCursor(0, 9);
+  display.printf("min. Feuchte: %.1f%%", min_humi.humi);
+  display.setCursor(0, 18);
+  display.printf(" %s", dateTimeStr(min_humi.time));
+
+  display.setCursor(0, 36);
+  display.printf("max. Feuchte: %.1f%%", max_humi.humi);
+  display.setCursor(0, 45);
+  display.printf(" %s", dateTimeStr(max_humi.time));
+
+  display.display();
+}
+
+void resetMinMaxTemp() {
   min_temp = current_measurement;
-  min_humi = current_measurement;
   max_temp = current_measurement;
+}
+
+void resetMinMaxHumi() {
+  min_humi = current_measurement;
   max_humi = current_measurement;
 }
 
@@ -255,9 +333,11 @@ void setup() {
 
   setClock();
   
-  resetMinMax();
+  resetMinMaxTemp();
+  resetMinMaxHumi();
 
   server.on("/", handleRoot);
+  server.on("/sensors", handleSensors);
   server.begin();
 }
 
@@ -289,17 +369,17 @@ void loop() {
     case 0:  //NORMAL:
       displayMeasurement();
       break;
-    case 1:  //MAX_TEMP + MAX_HUMI
-      displayMinMax(MINMAX_MAX);
+    case 1:  // MIN_TEMP + MAX_TEMP
+      displayMinMaxTemp();
       if (keyBpressed) {
-        resetMinMax();
+        resetMinMaxTemp();
         keyBpressed = false;
       }
       break;
-    case 2:  //MIN_TEMP + MIN_HUMI
-      displayMinMax(MINMAX_MIN);
+    case 2:  // MIN_HUMI + MAX_HUMI
+      displayMinMaxHumi();
       if (keyBpressed) {
-        resetMinMax();
+        resetMinMaxHumi();
         keyBpressed = false;
       }
       break;
