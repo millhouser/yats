@@ -1,6 +1,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <ArduinoJson.h>
 
 // WiFi Einstellungen - Bitte anpassen!
@@ -23,9 +23,9 @@ Settings currentSettings;
 void setup() {
   Serial.begin(115200);
   
-  // SPIFFS initialisieren
-  if (!SPIFFS.begin(true)) {
-    Serial.println("SPIFFS Mount Fehler");
+  // LittleFS initialisieren
+  if (!LittleFS.begin()) {
+    Serial.println("LittleFS Mount Fehler");
     return;
   }
   
@@ -60,8 +60,8 @@ void loop() {
 }
 
 void loadSettings() {
-  if (SPIFFS.exists("/settings.json")) {
-    File file = SPIFFS.open("/settings.json", "r");
+  if (LittleFS.exists("/settings.json")) {
+    File file = LittleFS.open("/settings.json", "r");
     if (file) {
       String content = file.readString();
       file.close();
@@ -91,7 +91,7 @@ void saveSettings() {
   doc["threshold"] = currentSettings.threshold;
   doc["apiKey"] = currentSettings.apiKey;
   
-  File file = SPIFFS.open("/settings.json", "w");
+  File file = LittleFS.open("/settings.json", "w");
   if (file) {
     serializeJson(doc, file);
     file.close();

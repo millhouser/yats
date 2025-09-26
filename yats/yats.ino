@@ -5,13 +5,19 @@
 #include <DHT.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <LittleFS.h>
+#include <ArduinoJson.h> // ArduinoJson by Benoit Blanchon
 #include <time.h>
 #include <limits.h>
 #include "html.h"
 
-// configure Wifi
-const char* ssid = "home";
-const char* password = "secretPassword";
+struct Settings {
+  String ssid = "home";
+  String password = "secretPassword";
+  String ssidAP = "yats";
+};
+
+Settings currentSettings;
 
 // define characters for the display
 #define DEG (char)247    // '°' on the display
@@ -80,9 +86,56 @@ int state = 0;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
 
+void loadSettings() {
+  if (LittleFS.exists("/settings.json")) {
+    File file = LittleFS.open("/settings.json", "r");
+    if (file) {
+      String content = file.readString();
+      file.close();
+      
+      JsonDocument doc;
+      deserializeJson(doc, content);
+      
+      // currentSettings.deviceName = doc["deviceName"] | "Pico Device";
+      // currentSettings.refreshInterval = doc["refreshInterval"] | 10;
+      // currentSettings.enableNotifications = doc["enableNotifications"] | true;
+      // currentSettings.threshold = doc["threshold"] | 25.5;
+      // currentSettings.apiKey = doc["apiKey"] | "";
+      currentSettings.ssid = doc["ssid"] | "home";
+      currentSettings.password = doc["password"] | "secretPassword";
+      currentSettings.ssidAP = doc["ssidAP"] | "yats";      
+      Serial.println("Einstellungen geladen");
+    }
+  } else {
+    Serial.println("Keine Einstellungen gefunden, verwende Standardwerte");
+    saveSettings(); // Speichere Standardwerte
+  }
+}
+
+void saveSettings() {
+  JsonDocument doc;
+  // doc["deviceName"] = currentSettings.deviceName;
+  // doc["refreshInterval"] = currentSettings.refreshInterval;
+  // doc["enableNotifications"] = currentSettings.enableNotifications;
+  // doc["threshold"] = currentSettings.threshold;
+  // doc["apiKey"] = currentSettings.apiKey;
+  doc["ssid"] = currentSettings.ssid;
+  doc["password"] = currentSettings.password;
+  doc["ssidAP"] = currentSettings.ssidAP;
+
+  File file = LittleFS.open("/settings.json", "w");
+  if (file) {
+    serializeJson(doc, file);
+    file.close();
+    Serial.println("Einstellungen gespeichert");
+  } else {
+    Serial.println("Fehler beim Speichern der Einstellungen");
+  }
+}
+
 void connectToWiFi() {
   Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, password);
+  WiFi.begin(currentSettings.ssid.c_str(), currentSettings.password.c_str());
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 10) {
     delay(1000);
@@ -92,7 +145,10 @@ void connectToWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("WiFi connected");
   } else {
-    Serial.println("WiFi connection failed");
+    Serial.println("WiFi connection failed, starting access point mode");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(currentSettings.ssidAP.c_str());
+    Serial.println("Access point started");
   }
 }
 
@@ -101,38 +157,24 @@ void setClock() {
 
   Serial.print("Waiting for NTP time sync: ");
   time_t now = time(nullptr);
-  while (now < 8 * 3600 * 2) {
+  int attempts = 0;
+  while (now < 8 * 3600 * 2  && attempts < 10) {
     delay(500);
     Serial.print(".");
     now = time(nullptr);
+    attempts++;
   }
-  Serial.println("");
-  struct tm timeinfo;
-  localtime_r(&now, &timeinfo);
-  Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
-}
-
-void handleRoot() {
-  server.send(200, "text/html", startPage);
-}
-
-void handleSensors() {
-    String json = "{";
-    json += "\"current_temp\":" + String(current_measurement.temp, 1) + ",\n";
-    json += "\"current_humi\":" + String(current_measurement.humi, 1) + ",\n";
-    json += "\"current_datetime\":\"" + String(dateTimeStr(current_measurement.time)) + "\",\n";
-    json += "\"min_temp\":" + String(min_temp.temp, 1) + ",\n";
-    json += "\"min_temp_datetime\":\"" + String(dateTimeStr(min_temp.time)) + "\",\n";
-    json += "\"max_temp\":" + String(max_temp.temp, 1) + ",\n";
-    json += "\"max_temp_datetime\":\"" + String(dateTimeStr(max_temp.time)) + "\",\n";
-    json += "\"min_humi\":" + String(min_humi.humi, 1) + ",\n";
-    json += "\"min_humi_datetime\":\"" + String(dateTimeStr(min_humi.time)) + "\",\n";
-    json += "\"max_humi\":" + String(max_temp.humi, 1) + ",\n";
-    json += "\"max_humi_datetime\":\"" + String(dateTimeStr(max_humi.time)) + "\"\n";
-    json += "}";
-    
-    server.send(200, "application/json", json);
+  if (now < 8 * 3600 * 2) {
+    Serial.println("NTP time sync failed!");
+    return;
+  } else {
+    Serial.println("NTP time sync successful!");
+    Serial.println("");
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    Serial.print("Current time: ");
+    Serial.print(asctime(&timeinfo));
+  }
 }
 
 int measure() {
@@ -227,12 +269,16 @@ void displayMinMaxHumi() {
   display.display();
 }
 
-void displayIPAddress() {
+void displayLANInfo() {
   display.clearDisplay();
-  display.setCursor(0, 9);
-  display.print("IP-Adresse:");
+  display.setCursor(0, 0);
+  display.print("WLAN-Informationen:");
+  display.setCursor(0, 18);
+  display.print("IP: " + WiFi.localIP().toString());
   display.setCursor(0, 27);
-  display.print(WiFi.localIP());
+  display.print("SSID: " + String(WiFi.SSID()));
+  //display.setCursor(0, 27);
+  //display.print("PW: " + String(WiFi.));
   display.display();
 }
 
@@ -279,6 +325,13 @@ void setup() {
 
   dht.begin();
 
+  if (!LittleFS.begin()) {
+    Serial.println("LittleFS Mount Fehler");
+    return;
+  } else {
+    loadSettings();
+  }
+
   connectToWiFi();
   
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
@@ -293,6 +346,11 @@ void setup() {
 
   server.on("/", handleRoot);
   server.on("/sensors", handleSensors);
+  server.on("/settingspage", handleSettingsPage);
+  server.on("/settings", HTTP_GET, handleGetSettings);
+  server.on("/settings", HTTP_POST, handleSaveSettings);
+  server.on("/style.css", handleCSS);
+
   server.begin();
 }
 
@@ -339,7 +397,7 @@ void loop() {
       }
       break;
     case 3:  //IP_ADDRESS:
-      displayIPAddress();
+      displayLANInfo();
       break;
     default:
       display.clearDisplay();
