@@ -1,6 +1,0 @@
-{
-    "board": "rp2040:rp2040:rpipico2w",
-    "port": "COM6",
-    "sketch": "yats.ino",
-    "output": "./build"
-}
