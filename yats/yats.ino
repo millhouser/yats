@@ -11,7 +11,7 @@
 
 // configure Wifi
 const char* ssid = "home";
-const char* password = "HilpeTritsche";
+const char* password = "secretPassword";
 
 // define characters for the display
 #define DEG (char)247    // '°' on the display
