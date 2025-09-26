@@ -219,6 +219,16 @@ char* dateTimeStr(time_t t) {
   return dts;
 }
 
+void displaySplashScreen() {
+  display.clearDisplay();
+  display.setTextSize(5);
+  display.setTextColor(SH110X_WHITE);
+  display.setCursor(3, 6);
+  display.print("yats");
+  display.display();
+  //  delay(1000);
+}
+
 void displayMeasurement() {
   display.clearDisplay();
   display.setCursor(9, 0);
@@ -315,18 +325,11 @@ void setup() {
   pinMode(KEY_A, INPUT_PULLUP);
   pinMode(KEY_B, INPUT_PULLUP);
 
-  dht.begin();
-
   display.begin(0, true);
   display.setRotation(1);
-  display.clearDisplay();
-  display.setTextSize(5);
-  display.setTextColor(SH110X_WHITE);
-  display.setCursor(3, 6);
-  display.print("yats");
-  display.display();
-  delay(1000);
-  display.setTextSize(4);
+  displaySplashScreen();
+
+  dht.begin();
 
   connectToWiFi();
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
