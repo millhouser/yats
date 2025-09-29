@@ -314,6 +314,19 @@ void setMinMax() {
   }
 }
 
+bool checkIntervall(unsigned long &lastMillis, unsigned long intervall) {
+  unsigned long currentMillis = millis();
+  if (currentMillis < lastMillis) {
+    lastMillis = intervall - (ULONG_MAX - lastMillis);
+  }
+  if (currentMillis - lastMillis >= intervall) {
+    lastMillis = currentMillis;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(KEY_A, INPUT_PULLUP);
@@ -355,24 +368,12 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
-
-  // always measure
-  if (currentMillis < lastMeasurementMillis) {
-    lastMeasurementMillis = MEASUREMENT_INTERVALL - (ULONG_MAX - lastMeasurementMillis);
-  }
-  if (currentMillis < lastReconnectMillis) {
-    lastMeasurementMillis = RECONNECT_INTERVALL - (ULONG_MAX - lastReconnectMillis);
-  }
-
-  if (currentMillis - lastReconnectMillis >= RECONNECT_INTERVALL) {
-    lastReconnectMillis = currentMillis;
+    if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
     connectToWiFi();
     setClock();
   }
 
-  if (currentMillis - lastMeasurementMillis >= MEASUREMENT_INTERVALL) {
-    lastMeasurementMillis = currentMillis;
+  if (checkIntervall(lastMeasurementMillis, MEASUREMENT_INTERVALL)) {
     if (measure() == 0) {
       setMinMax();
     }
