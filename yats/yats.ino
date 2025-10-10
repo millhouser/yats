@@ -336,7 +336,7 @@ void setup() {
 
   display.begin(0, true);
   display.setRotation(1);
-  display.setContrast(0);
+  display.setContrast(64);
   displaySplashScreen();
 
   dht.begin();
