@@ -336,6 +336,7 @@ void setup() {
 
   display.begin(0, true);
   display.setRotation(1);
+  display.setContrast(0);
   displaySplashScreen();
 
   dht.begin();
@@ -369,21 +370,7 @@ void setup() {
   server.begin();
 }
 
-uint8_t dim = 255;
 void loop() {
-  if (checkIntervall(lastDimMillis, DIM_INTERVALL)) {
-    display.setContrast(dim);
-    if (dim == 0) {
-      dim = 255;
-      return;
-    }
-    if (dim == 1) {
-      dim = 0;
-      return;
-    }
-    if (dim == 255) dim = 1;
-  }
-
   if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
     connectToWiFi();
     setClock();
