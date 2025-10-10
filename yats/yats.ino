@@ -48,8 +48,9 @@ bool keyBpressed = false;
 WebServer server(80);
 
 // define intervalls for the state machine
-#define MEASUREMENT_INTERVALL 5000 // seconds
-#define RECONNECT_INTERVALL 600000 // seconds
+#define DIM_INTERVALL 2000 // milliseconds
+#define MEASUREMENT_INTERVALL 5000 // milliseconds
+#define RECONNECT_INTERVALL 600000 // milliseconds
 
 // state machine states
 enum states { NORMAL,
@@ -83,6 +84,7 @@ const int daylightOffset_sec = 3600;
 
 // setup state machine
 int state = 0;
+unsigned long lastDimMillis = 0;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
 
@@ -367,8 +369,22 @@ void setup() {
   server.begin();
 }
 
+uint8_t dim = 255;
 void loop() {
-    if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
+  if (checkIntervall(lastDimMillis, DIM_INTERVALL)) {
+    display.setContrast(dim);
+    if (dim == 0) {
+      dim = 255;
+      return;
+    }
+    if (dim == 1) {
+      dim = 0;
+      return;
+    }
+    if (dim == 255) dim = 1;
+  }
+
+  if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
     connectToWiFi();
     setClock();
   }
