@@ -11,6 +11,14 @@
 #include <limits.h>
 #include "html.h"
 
+// installed libraries:
+// Adafruit SH110X Library by Adafruit
+// Adafruit GFX Library by Adafruit
+// DHT sensor library by Adafruit 
+// Adafruit Unified Sensor by Adafruit
+// ArduinoJson by Benoit Blanchon
+// Adafruit BusIO by Adafruit
+
 struct Settings {
   String ssid = "home";
   String password = "secretPassword";
