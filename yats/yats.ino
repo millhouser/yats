@@ -405,6 +405,7 @@ void setup() {
 void loop() {
   if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
     connectToWiFi();
+    connectToMqtt();
     setClock();
   }
 
