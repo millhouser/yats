@@ -39,6 +39,11 @@ void handleGetSettings() {
   doc["ssid"] = currentSettings.ssid;
   doc["password"] = currentSettings.password;
   doc["ssidAP"] = currentSettings.ssidAP;
+  doc["mqttServer"] = currentSettings.mqttServer;
+  doc["mqttPort"] = currentSettings.mqttPort;
+  doc["mqttTopic"] = currentSettings.mqttTopic;
+  doc["mqttUsername"] = currentSettings.mqttUsername;
+  doc["mqttPassword"] = currentSettings.mqttPassword;
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
@@ -58,6 +63,11 @@ void handleSaveSettings() {
     currentSettings.ssid = doc["ssid"] | currentSettings.ssid;
     currentSettings.password = doc["password"] | currentSettings.password;
     currentSettings.ssidAP = doc["ssidAP"] | currentSettings.ssidAP;
+  currentSettings.mqttServer = doc["mqttServer"] | currentSettings.mqttServer;
+  currentSettings.mqttPort = doc["mqttPort"] | currentSettings.mqttPort;
+  currentSettings.mqttTopic = doc["mqttTopic"] | currentSettings.mqttTopic;
+      currentSettings.mqttUsername = doc["mqttUsername"] | currentSettings.mqttUsername;
+      currentSettings.mqttPassword = doc["mqttPassword"] | currentSettings.mqttPassword;
 
     // In Datei speichern
     saveSettings();

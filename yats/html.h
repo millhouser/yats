@@ -89,6 +89,31 @@ String settingsPage = u8R"rawliteral(
                     <input type="text" id="ssidAP" name="ssidAP" required>
                 </div>
 
+                <div class="form-group">
+                    <label for="mqttServer">MQTT Broker (Host):</label>
+                    <input type="text" id="mqttServer" name="mqttServer" placeholder="test.mosquitto.org">
+                </div>
+
+                <div class="form-group">
+                    <label for="mqttPort">MQTT Port:</label>
+                    <input type="number" id="mqttPort" name="mqttPort" value="1883">
+                </div>
+
+                <div class="form-group">
+                    <label for="mqttTopic">MQTT Topic (root):</label>
+                    <input type="text" id="mqttTopic" name="mqttTopic" value="yats">
+                </div>
+
+                <div class="form-group">
+                    <label for="mqttUsername">MQTT Username:</label>
+                    <input type="text" id="mqttUsername" name="mqttUsername" placeholder="optional">
+                </div>
+
+                <div class="form-group">
+                    <label for="mqttPassword">MQTT Password:</label>
+                    <input type="password" id="mqttPassword" name="mqttPassword" placeholder="optional">
+                </div>
+
                 <!--
                 <div class="form-group">
                     <label for="refreshInterval">Aktualisierungsintervall (Sekunden):</label>
@@ -140,6 +165,11 @@ String settingsPage = u8R"rawliteral(
                     document.getElementById('ssid').value = data.ssid;
                     document.getElementById('password').value = data.password;
                     document.getElementById('ssidAP').value = data.ssidAP;
+                    document.getElementById('mqttServer').value = data.mqttServer || '';
+                    document.getElementById('mqttPort').value = data.mqttPort || 1883;
+                    document.getElementById('mqttTopic').value = data.mqttTopic || '';
+                    document.getElementById('mqttUsername').value = data.mqttUsername || '';
+                    document.getElementById('mqttPassword').value = data.mqttPassword || '';
                 })
                 .catch(error => {
                     showStatus('Fehler beim Laden der Einstellungen: ' + error, 'error');
@@ -161,6 +191,11 @@ String settingsPage = u8R"rawliteral(
             settings.ssid = formData.get('ssid');
             settings.password = formData.get('password');
             settings.ssidAP = formData.get('ssidAP');
+            settings.mqttServer = formData.get('mqttServer') || '';
+            settings.mqttPort = parseInt(formData.get('mqttPort')) || 1883;
+            settings.mqttTopic = formData.get('mqttTopic') || '';
+            settings.mqttUsername = formData.get('mqttUsername') || '';
+            settings.mqttPassword = formData.get('mqttPassword') || '';
 
             fetch('/settings', {
                 method: 'POST',

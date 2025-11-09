@@ -5,6 +5,7 @@
 #include <DHT.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ArduinoMqttClient.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h> // ArduinoJson by Benoit Blanchon
 #include <time.h>
@@ -18,11 +19,17 @@
 // Adafruit Unified Sensor by Adafruit
 // ArduinoJson by Benoit Blanchon
 // Adafruit BusIO by Adafruit
+// ArduinoMqttClient by Arduino
 
 struct Settings {
   String ssid = "home";
   String password = "secretPassword";
   String ssidAP = "yats";
+  String mqttServer = "test.mosquitto.org";
+  int mqttPort = 1883;
+  String mqttTopic = "yats";
+  String mqttUsername = "";
+  String mqttPassword = "";
 };
 
 Settings currentSettings;
@@ -54,6 +61,11 @@ bool keyBpressed = false;
 
 // configure web server
 WebServer server(80);
+// MQTT support
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
+
+unsigned long lastMqttConnectAttempt = 0;
 
 // define intervalls for the state machine
 #define DIM_INTERVALL 2000 // milliseconds
@@ -113,7 +125,12 @@ void loadSettings() {
       // currentSettings.apiKey = doc["apiKey"] | "";
       currentSettings.ssid = doc["ssid"] | "home";
       currentSettings.password = doc["password"] | "secretPassword";
-      currentSettings.ssidAP = doc["ssidAP"] | "yats";      
+  currentSettings.ssidAP = doc["ssidAP"] | "yats";
+  currentSettings.mqttServer = doc["mqttServer"] | "test.mosquitto.org";
+  currentSettings.mqttPort = doc["mqttPort"] | 1883;
+  currentSettings.mqttTopic = doc["mqttTopic"] | "yats";
+        currentSettings.mqttUsername = doc["mqttUsername"] | "";
+        currentSettings.mqttPassword = doc["mqttPassword"] | "";
       Serial.println("Einstellungen geladen");
     }
   } else {
@@ -132,6 +149,11 @@ void saveSettings() {
   doc["ssid"] = currentSettings.ssid;
   doc["password"] = currentSettings.password;
   doc["ssidAP"] = currentSettings.ssidAP;
+  doc["mqttServer"] = currentSettings.mqttServer;
+  doc["mqttPort"] = currentSettings.mqttPort;
+  doc["mqttTopic"] = currentSettings.mqttTopic;
+  doc["mqttUsername"] = currentSettings.mqttUsername;
+  doc["mqttPassword"] = currentSettings.mqttPassword;
 
   File file = LittleFS.open("/settings.json", "w");
   if (file) {
@@ -364,6 +386,8 @@ void setup() {
   tzset();
 
   setClock();
+  // Try to connect to MQTT broker (if configured)
+  connectToMqtt();
   
   resetMinMaxTemp();
   resetMinMaxHumi();
@@ -387,7 +411,10 @@ void loop() {
   if (checkIntervall(lastMeasurementMillis, MEASUREMENT_INTERVALL)) {
     if (measure() == 0) {
       setMinMax();
+      // publish measurement over MQTT if connected
+      publishMeasurement();
     }
+
   }
 
   switch (state) {
@@ -433,4 +460,57 @@ void loop() {
   }
 
   server.handleClient();
+}
+
+// MQTT connection helper
+void connectToMqtt() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (mqttClient.connected()) return;
+
+  String clientId = "yats-" + WiFi.localIP().toString();
+  clientId.replace('.', '_');
+
+  Serial.print("Connecting to MQTT broker ");
+  Serial.print(currentSettings.mqttServer);
+  Serial.print(":");
+  Serial.println(currentSettings.mqttPort);
+
+  // prepare username/password pointers (nullptr if empty)
+  const char* user = currentSettings.mqttUsername.length() ? currentSettings.mqttUsername.c_str() : nullptr;
+  const char* pass = currentSettings.mqttPassword.length() ? currentSettings.mqttPassword.c_str() : nullptr;
+
+  mqttClient.setUsernamePassword(user, pass);
+
+  // connect using optional credentials (clientId handled by library or left default)
+  bool ok = mqttClient.connect(currentSettings.mqttServer.c_str(), currentSettings.mqttPort); //, user, pass);
+  if (ok) {
+    Serial.println("MQTT connected");
+  } else {
+    Serial.println("MQTT connection failed");
+  }
+}
+
+void publishMeasurement() {
+  if (!mqttClient.connected()) return;
+
+  String topic = currentSettings.mqttTopic + "/telemetry";
+  String payload = "{";
+  payload += "\"temperature\":" + String(current_measurement.temp, 1) + ",";
+  payload += "\"humidity\":" + String(current_measurement.humi, 1) + ",";
+  payload += "\"time\":\"" + String(dateTimeStr(current_measurement.time)) + "\"";
+  payload += "}";
+
+  // ArduinoMqttClient uses beginMessage/print/endMessage pattern
+  if (mqttClient.beginMessage(topic.c_str())) {
+    mqttClient.print(payload);
+    bool ok = mqttClient.endMessage();
+    
+    if (ok) {
+      Serial.print("Published to "); Serial.print(topic); Serial.print(": "); Serial.println(payload);
+    } else {
+      Serial.println("MQTT publish failed");
+    }
+  } else {
+    Serial.println("MQTT begin message failed");
+  }
 }
