@@ -63,11 +63,11 @@ void handleSaveSettings() {
     currentSettings.ssid = doc["ssid"] | currentSettings.ssid;
     currentSettings.password = doc["password"] | currentSettings.password;
     currentSettings.ssidAP = doc["ssidAP"] | currentSettings.ssidAP;
-  currentSettings.mqttServer = doc["mqttServer"] | currentSettings.mqttServer;
-  currentSettings.mqttPort = doc["mqttPort"] | currentSettings.mqttPort;
-  currentSettings.mqttTopic = doc["mqttTopic"] | currentSettings.mqttTopic;
-      currentSettings.mqttUsername = doc["mqttUsername"] | currentSettings.mqttUsername;
-      currentSettings.mqttPassword = doc["mqttPassword"] | currentSettings.mqttPassword;
+    currentSettings.mqttServer = doc["mqttServer"] | currentSettings.mqttServer;
+    currentSettings.mqttPort = doc["mqttPort"] | currentSettings.mqttPort;
+    currentSettings.mqttTopic = doc["mqttTopic"] | currentSettings.mqttTopic;
+    currentSettings.mqttUsername = doc["mqttUsername"] | currentSettings.mqttUsername;
+    currentSettings.mqttPassword = doc["mqttPassword"] | currentSettings.mqttPassword;
 
     // In Datei speichern
     saveSettings();

@@ -28,6 +28,8 @@ const char* startPage = u8R"rawliteral(
     <p>Minimale Feuchtigkeit: <span id="min_humi">--.-</span>%, <span id="min_humi_datetime">--.--.-- --:--</span></p>
     <p>Maximale Feuchtigkeit: <span id="max_humi">--.-</span>%, <span id="max_humi_datetime">--.--.-- --:--</span></p>
     <button onclick="updateSensors()">Aktualisieren</button>
+    <br><br>
+    <a href="/settingspage">⚙️ Zu den Einstellungen</a>
 
     <script>
         function updateSensors() {
