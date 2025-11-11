@@ -71,3 +71,22 @@ void displayLANInfo() {
   //display.print("PW: " + String(WiFi.));
   display.display();
 }
+
+void displayPower(bool powerState) {
+  if (powerState) {
+    if (!displayOn) {
+      // implement on hardware side first
+      // maybe GP12 (OLED_RST) = HIGH works good enough
+      digitalWrite(OLED_RST, HIGH);
+      displayOn = true;
+    }
+    DisplayTimeOutMillis = millis();
+  } else {
+    if (displayOn) {
+      // implement on hardware side first
+      // maybe GP12 (OLED_RST) = LOW works good enough
+      digitalWrite(OLED_RST, LOW);
+      displayOn = false;
+    }
+  }
+}

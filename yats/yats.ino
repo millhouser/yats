@@ -70,12 +70,7 @@ unsigned long lastMqttConnectAttempt = 0;
 // define intervalls for the state machine
 #define MEASUREMENT_INTERVALL 5000 // milliseconds
 #define RECONNECT_INTERVALL 600000 // milliseconds
-
-// state machine states
-enum states { NORMAL,
-              MINMAX_TEMP,
-              MINMAX_HUMI,
-              IP_ADDRESS };
+#define DISPLAY_TIMEOUT 5000 // milliseconds
 
 // for the displayMinMax() function
 enum minmax { MINMAX_MIN,
@@ -103,9 +98,10 @@ const int daylightOffset_sec = 3600;
 
 // setup state machine
 int state = 0;
-unsigned long lastDimMillis = 0;
 unsigned long lastMeasurementMillis = 0;
 unsigned long lastReconnectMillis = 0;
+unsigned long DisplayTimeOutMillis = 0;
+bool displayOn = true;
 
 bool checkIntervall(unsigned long &lastMillis, unsigned long intervall) {
   unsigned long currentMillis = millis();
@@ -124,6 +120,9 @@ void setup() {
   Serial.begin(115200);
   pinMode(KEY_A, INPUT_PULLUP);
   pinMode(KEY_B, INPUT_PULLUP);
+
+  pinMode(OLED_RST, OUTPUT);
+  digitalWrite(OLED_RST, HIGH);
 
   display.begin(0, true);
   display.setRotation(1);
@@ -161,21 +160,30 @@ void setup() {
   server.on("/style.css", handleCSS);
 
   server.begin();
+
+  DisplayTimeOutMillis = millis();
 }
 
 void loop() {
+  // do a regular reconnect an update clock
   if (checkIntervall(lastReconnectMillis, RECONNECT_INTERVALL)) {
     connectToWiFi();
     connectToMqtt();
     setClock();
   }
 
+  // do the measurement regularly
   if (checkIntervall(lastMeasurementMillis, MEASUREMENT_INTERVALL)) {
     if (measure() == 0) {
       setMinMax();
       // publish measurement over MQTT if connected
       publishMeasurement();
     }
+  }
+
+  // turn off display after timeout
+  if (checkIntervall(DisplayTimeOutMillis, DISPLAY_TIMEOUT)) {
+    displayPower(false);
   }
 
   switch (state) {
@@ -207,15 +215,21 @@ void loop() {
   }
 
   if (digitalRead(KEY_A) == LOW) {
-    state = state + 1;
-    if (state > 3) state = 0;
+    if (displayOn) {
+      state = state + 1;
+      if (state > 3) state = 0;
+    }
     delay(200);
+    displayPower(true);
   } else {
   }
 
   if (digitalRead(KEY_B) == LOW) {
-    keyBpressed = true;
+    if (displayOn) {
+      keyBpressed = true;
+    }
     delay(200);
+    displayPower(true);
   } else {
     keyBpressed = false;
   }
